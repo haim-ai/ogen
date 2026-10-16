@@ -40,7 +40,7 @@ export default function Nav() {
           <Image src={asset(dark ? "/media/logo-full-light.png" : "/media/logo-full.png")} alt="נ.ג. עוגן" fill sizes="77px" className="object-contain" priority />
         </a>
 
-        <p className={`label hidden items-center gap-2 rounded-full px-3 py-1.5 sm:flex ${dark ? "bg-white/10" : "bg-mist"}`} aria-live="polite">
+        <p className={`label hidden items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 sm:flex ${dark ? "bg-white/10" : "bg-mist"}`} aria-live="polite">
           {sea.state === "storm" ? (
             <>
               <span aria-hidden className="size-2 animate-pulse rounded-full bg-alert" />
@@ -54,11 +54,11 @@ export default function Nav() {
           )}
         </p>
 
-        <nav aria-label="ראשי" className="ms-auto hidden lg:block">
+        <nav aria-label="ראשי" className="ms-auto hidden xl:block">
           <ul className="flex items-center gap-7">
             {LINKS.map((l) => (
               <li key={l.href}>
-                <a href={l.href} className="label text-[0.92rem] opacity-80 transition-opacity hover:opacity-100">
+                <a href={l.href} className="label whitespace-nowrap text-[0.92rem] opacity-80 transition-opacity hover:opacity-100">
                   {l.label}
                 </a>
               </li>
@@ -66,7 +66,7 @@ export default function Nav() {
           </ul>
         </nav>
 
-        <a href={WA} target="_blank" rel="noopener" className="pill pill-solid ms-auto !min-h-[44px] !py-1 text-[0.92rem] lg:ms-6">
+        <a href={WA} target="_blank" rel="noopener" className="pill pill-solid ms-auto shrink-0 whitespace-nowrap !min-h-[44px] !py-1 text-[0.92rem] xl:ms-6">
           <span className="dot !size-8" aria-hidden>
             ←
           </span>

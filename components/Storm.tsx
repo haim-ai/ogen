@@ -55,6 +55,11 @@ export default function Storm() {
     let last = performance.now();
     let spawnClock = 0;
     let n = Math.min(4, max);
+    // "band" layout: when the headline leaves no open water beside it (phones, tablets, narrow windows),
+    // the cards live in the band between the headline and the bottom, never over the text
+    let band = false;
+    let bandTop = 0;
+    let bandBottom = 0;
 
     const measure = () => {
       const r = sec.getBoundingClientRect();
@@ -64,6 +69,12 @@ export default function Storm() {
         const b = el.getBoundingClientRect();
         return new DOMRect(b.left - r.left - 18, b.top - r.top - 18, b.width + 36, b.height + 36);
       });
+      const cardW = cards.current[0]?.offsetWidth || 250;
+      band = avoid[0].left < cardW + 40;
+      bandTop = avoid[0].bottom;
+      // on a phone the gate sits in the middle of the bottom, so the band ends above it
+      const gateAcross = avoid[1].left < W * 0.35;
+      bandBottom = gateAcross ? avoid[1].top : H - 8;
       const bt = button.current!.getBoundingClientRect();
       const rp = rope.current!;
       rp.style.left = `${bt.left - r.left + bt.width / 2 - 1.5}px`;
@@ -74,12 +85,12 @@ export default function Storm() {
       const el = cards.current[i]!;
       const w = el.offsetWidth || 260;
       const h = el.offsetHeight || 64;
-      // start in the open water left of the headline (physical left in RTL)
-      const x = Math.random() * Math.max(40, W * (mobile ? 0.7 : 0.5) - w) + 12;
-      const top = mobile && avoid[0] ? avoid[0].bottom : H * 0.12;
-      const bottom = mobile && avoid[1] ? avoid[1].top - h : H * 0.85;
-      // new ones arrive under the nav (and on a phone, in the water below the headline), never through text
-      const y = entering && !mobile ? NAV_CLEAR : top + Math.random() * Math.max(10, bottom - top);
+      // start in the open water: left of the headline (physical left in RTL), or anywhere in the band
+      const x = band ? 12 + Math.random() * Math.max(10, W - w - 24) : Math.random() * Math.max(40, W * 0.5 - w) + 12;
+      const top = band ? bandTop : H * 0.12;
+      const bottom = band ? bandBottom - h : H * 0.85;
+      // new ones arrive under the nav (or in the band), never through text
+      const y = entering && !band ? NAV_CLEAR : top + Math.random() * Math.max(10, bottom - top);
       return { x, y, vx: (Math.random() - 0.5) * 30, vy: entering ? 120 + Math.random() * 80 : 0, a: (Math.random() - 0.5) * 14, va: 0, phase: Math.random() * 6.28, born: performance.now(), w, h };
     };
 
@@ -99,7 +110,7 @@ export default function Storm() {
 
       // the morning keeps coming
       spawnClock += dt;
-      if (n < max && spawnClock > (mobile ? 1.3 : 0.95)) {
+      if (n < (band ? Math.min(max, 8) : max) && spawnClock > (mobile ? 1.3 : 0.95)) {
         spawnClock = 0;
         bodies.push(make(n, true));
         n++;
@@ -125,7 +136,8 @@ export default function Storm() {
         // swell and current
         const swell = Math.sin(t * 0.9 + b.phase) * 14 + Math.sin(t * 0.37 + b.phase * 2) * 8;
         let fx = Math.sin(t * 0.21 + b.phase) * 10 - 6;
-        let fy = (H * 0.45 + swell * 6 - (b.y + b.h / 2)) * 0.25;
+        const sea = band ? (bandTop + bandBottom) / 2 : H * 0.45;
+        let fy = (sea + swell * (band ? 2 : 6) - (b.y + b.h / 2)) * 0.25;
         // the cursor pushes them away
         const dx = b.x + b.w / 2 - mouse.x;
         const dy = b.y + b.h / 2 - mouse.y;
@@ -168,11 +180,11 @@ export default function Storm() {
         if (b.x < 8) (b.x = 8), (b.vx = Math.abs(b.vx) * 0.5);
         if (b.x + b.w > W - 8) (b.x = W - 8 - b.w), (b.vx = -Math.abs(b.vx) * 0.5);
         // floor and ceiling. On a phone the headline spans the width, so the water is the band between it and the gate
-        const floor = mobile && avoid[1] ? avoid[1].top - b.h : H - b.h - 8;
-        const ceiling = mobile && avoid[0] ? avoid[0].bottom : NAV_CLEAR;
+        const ceiling = band ? bandTop : NAV_CLEAR;
+        // a short screen leaves a thin band: then they pile up on one line rather than climb over the text
+        const floor = Math.max(ceiling, (band ? bandBottom : H - 8) - b.h);
         if (b.y > floor) (b.y = floor), (b.vy = -Math.abs(b.vy) * 0.4);
-        // new arrivals still fall in from above; after that the ceiling holds
-        if (b.y < ceiling && now - b.born > 1400) (b.y = ceiling), (b.vy = Math.abs(b.vy) * 0.4);
+        if (b.y < ceiling && (band || now - b.born > 1400)) (b.y = ceiling), (b.vy = Math.abs(b.vy) * 0.4);
         settleAt(b, el);
       }
     };
@@ -228,6 +240,9 @@ export default function Storm() {
     sec.addEventListener("pointerleave", onLeave);
     const ro = new ResizeObserver(measure);
     ro.observe(sec);
+    ro.observe(headline.current!);
+    // the headline only reaches its real width once the display font has loaded
+    document.fonts?.ready.then(measure);
     const st = ScrollTrigger.create({ trigger: sec, start: "top top", end: "bottom 25%", onLeave: () => anchorFn.current(true) });
 
     return () => {
@@ -265,7 +280,7 @@ export default function Storm() {
             <br />
             כיבוי שריפות?
           </p>
-          <p className="mt-5 max-w-[34ch] text-lg text-white/75">העובד לא הגיע, המסדרון לא נוקה, והטלפון לא מפסיק. החזיקו את הכפתור, נוריד עוגן.</p>
+          <p className="storm-sub mt-5 max-w-[34ch] text-lg text-white/75">העובד לא הגיע, המסדרון לא נוקה, והטלפון לא מפסיק. החזיקו את הכפתור, נוריד עוגן.</p>
         </div>
 
         {STORM.map((s, i) => (
@@ -299,7 +314,7 @@ export default function Storm() {
             onPointerLeave={release}
             onKeyDown={key}
             onContextMenu={(e) => e.preventDefault()}
-            className="relative grid size-[132px] touch-none select-none place-items-center rounded-full bg-white/5 text-cyan ring-1 ring-white/15 transition-colors hover:bg-white/10"
+            className="relative grid size-[112px] touch-none md:size-[132px] select-none place-items-center rounded-full bg-white/5 text-cyan ring-1 ring-white/15 transition-colors hover:bg-white/10"
             aria-label="להוריד עוגן: החזיקו לחוץ, או Enter"
           >
             <svg aria-hidden viewBox="0 0 132 132" className="absolute inset-0 -rotate-90">
@@ -318,7 +333,7 @@ export default function Storm() {
       </div>
 
       {/* the calm, opened from where the anchor hit */}
-      <div ref={calm} className="absolute inset-0 bg-calm text-ink" style={{ clipPath: "circle(0px at 50% 50%)" }} aria-hidden={!anchored}>
+      <div ref={calm} data-calm className="absolute inset-0 bg-calm text-ink" style={{ clipPath: "circle(0px at 50% 50%)" }} aria-hidden={!anchored}>
         <div className="mx-auto grid h-full max-w-[1400px] items-center gap-8 px-5 pb-8 pt-[calc(var(--nav-h)+2rem)] md:grid-cols-12 md:px-12">
           <div className="md:col-span-7">
             <p data-rise className="label text-cyan-ink">
